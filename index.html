@@ -121,6 +121,9 @@ h1,h2,h3{font-family:'Roboto Slab',serif;margin:0;}
 .sale-form label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.05em;}
 .sale-form select,.sale-form input,.sale-form textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:3px;font-family:'Inter',sans-serif;font-size:14px;background:var(--surface);}
 #venda-cliente,#venda-data,#venda-forma,#venda-data-pagamento,#venda-desconto{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:3px;font-family:'Inter',sans-serif;font-size:14px;background:var(--surface);}
+.desconto-tipo-btn{padding:10px 14px;border:none;background:var(--surface);color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;cursor:pointer;}
+.desconto-tipo-btn+.desconto-tipo-btn{border-left:1px solid var(--line);}
+.desconto-tipo-btn.active{background:var(--primary);color:#fff;}
 .sale-preview{display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;}
 .sale-preview img{width:64px;height:64px;object-fit:cover;border-radius:4px;background:var(--accent-soft);}
 .sale-preview .ph{width:64px;height:64px;border-radius:4px;background:var(--accent-soft);flex-shrink:0;}
@@ -336,8 +339,14 @@ tr.cancelled td.status-cell{text-decoration:none;}
         <label>Data de pagamento</label>
         <input type="date" id="venda-data-pagamento">
 
-        <label>Desconto (%)</label>
-        <input type="number" id="venda-desconto" min="0" max="100" step="0.1" value="0">
+        <label>Desconto</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" id="venda-desconto" min="0" step="0.1" value="0" style="flex:1;">
+          <div style="display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;flex-shrink:0;">
+            <button type="button" class="desconto-tipo-btn active" data-tipo="percentual" id="btn-desconto-percentual">%</button>
+            <button type="button" class="desconto-tipo-btn" data-tipo="valor" id="btn-desconto-valor">R$</button>
+          </div>
+        </div>
 
         <div class="sale-total-row" style="flex-direction:column;align-items:stretch;gap:7px;">
           <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);">
@@ -1293,6 +1302,28 @@ function updateVendaPreview(){
 document.getElementById('venda-produto').addEventListener('change', updateVendaPreview);
 document.getElementById('venda-qtd').addEventListener('input', updateVendaPreview);
 
+let descontoTipo = 'percentual';
+
+function calcularDescontoValor(subtotal){
+  const bruto = parseFloat(document.getElementById('venda-desconto').value) || 0;
+  if(descontoTipo === 'valor'){
+    return Math.min(Math.max(0, bruto), subtotal);
+  }
+  const pct = Math.min(100, Math.max(0, bruto));
+  return subtotal * (pct/100);
+}
+
+document.querySelectorAll('.desconto-tipo-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    descontoTipo = btn.dataset.tipo;
+    document.querySelectorAll('.desconto-tipo-btn').forEach(b=>b.classList.toggle('active', b===btn));
+    const input = document.getElementById('venda-desconto');
+    if(descontoTipo === 'percentual'){ input.max = '100'; input.step = '0.1'; }
+    else { input.removeAttribute('max'); input.step = '0.01'; }
+    renderCartTable();
+  });
+});
+
 function renderCartTable(){
   const wrap = document.getElementById('cart-table-wrap');
   if(!cart.length){
@@ -1309,8 +1340,7 @@ function renderCartTable(){
     </tbody></table>`;
   }
   const subtotal = cart.reduce((s,it)=>s+it.qtd*it.precoUnit,0);
-  const descontoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('venda-desconto').value) || 0));
-  const descontoValor = subtotal * (descontoPct/100);
+  const descontoValor = calcularDescontoValor(subtotal);
   document.getElementById('venda-subtotal').textContent = brl(subtotal);
   document.getElementById('venda-desconto-valor').textContent = brl(descontoValor);
   document.getElementById('venda-total').textContent = brl(subtotal - descontoValor);
@@ -1421,6 +1451,9 @@ async function finalizarVenda(ctx){
   document.getElementById('venda-data').value = '';
   document.getElementById('venda-data-pagamento').value = '';
   document.getElementById('venda-desconto').value = '0';
+  descontoTipo = 'percentual';
+  document.querySelectorAll('.desconto-tipo-btn').forEach(b=>b.classList.toggle('active', b.dataset.tipo==='percentual'));
+  document.getElementById('venda-desconto').max = '100';
   document.getElementById('venda-cliente').value = '';
   showToast(ctx.merge ? `Venda somada à cobrança existente do cliente.` : `Venda registrada: ${totalItens} item(ns).`);
   renderVendas();
@@ -1449,7 +1482,9 @@ document.getElementById('btn-confirmar-venda').addEventListener('click', async (
     if(!p || it.qtd > p.qtd){ showToast(`Estoque insuficiente para ${it.produtoNome}.`); return; }
   }
 
-  const descontoPct = Math.min(100, Math.max(0, parseFloat(document.getElementById('venda-desconto').value) || 0));
+  const subtotalCarrinho = cart.reduce((s,it)=>s+it.qtd*it.precoUnit,0);
+  const descontoValorEfetivo = calcularDescontoValor(subtotalCarrinho);
+  const descontoPct = subtotalCarrinho > 0 ? (descontoValorEfetivo / subtotalCarrinho) * 100 : 0;
   const statusPagamentoInicial = dataPagamento === dataVal.slice(0,10) ? 'Pago' : 'Aguardando Pagamento';
 
   const ctx = { clienteId, clienteNome, clienteContato, dataVal, dataPagamento, forma, descontoPct, statusPagamentoInicial };
@@ -1688,7 +1723,7 @@ function renderHistorico(){
         </select>
       </td>
       <td class="status-cell">${v.cancelada ? '<span class="badge badge-cancel">Cancelada</span>' : '<span class="badge badge-ok">Concluída</span>'}</td>
-      <td>${v.cancelada ? '—' : `<button class="btn btn-danger btn-sm" onclick="cancelarVenda('${v.id}')">Cancelar</button>`}</td>
+      <td>${v.cancelada ? `<button class="btn btn-danger btn-sm" onclick="excluirVendaCancelada('${v.id}')">Excluir</button>` : `<button class="btn btn-danger btn-sm" onclick="cancelarVenda('${v.id}')">Cancelar</button>`}</td>
     </tr>
   `;}).join('');
 }
@@ -1725,6 +1760,21 @@ window.atualizarStatusPagamento = async function(id, novoStatus){
   await saveSales();
   renderHistorico();
   renderFinanceiro();
+};
+
+window.excluirVendaCancelada = async function(id){
+  const venda = sales.find(v=>v.id===id);
+  if(!venda || !venda.cancelada) return;
+  if(!confirm(`Excluir esta venda cancelada (${venda.qtd}x ${venda.produtoNome}) do histórico? Essa ação não pode ser desfeita.`)) return;
+  sales = sales.filter(v=>v.id!==id);
+  if(supabaseConfigurado){
+    const {error} = await supabaseClient.from('vendas').delete().eq('id', id);
+    if(error){ console.error(error); showToast('Erro ao excluir do banco de dados.'); }
+  } else {
+    await saveSales();
+  }
+  renderHistorico();
+  showToast('Venda cancelada excluída do histórico.');
 };
 
 window.cancelarVenda = async function(id){
