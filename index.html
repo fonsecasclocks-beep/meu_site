@@ -41,6 +41,9 @@ h1,h2,h3{font-family:'Roboto Slab',serif;margin:0;}
 .sidebar-foot{margin-top:auto;padding:16px 24px 0;font-size:11.5px;color:#7C8B81;border-top:1px solid rgba(255,255,255,0.12);padding-top:16px;}
 .brand-logo{max-width:120px;max-height:48px;object-fit:contain;margin-bottom:10px;display:block;}
 .brand-edit{background:none;border:none;color:#8FA398;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer;padding:0;margin-top:10px;}
+.valor-money{transition:filter .12s;}
+body.valores-ocultos .valor-money{filter:blur(6px);user-select:none;}
+body.valores-ocultos .valor-money:hover{filter:none;}
 .brand-edit:hover{color:var(--gold);}
 
 /* Main */
@@ -196,6 +199,7 @@ tr.cancelled td.status-cell{text-decoration:none;}
     <div class="nav-item" data-view="financeiro"><span class="nav-icon">$</span> Controle Financeiro</div>
     <div class="nav-item" data-view="historico"><span class="nav-icon">≡</span> Histórico</div>
     <div class="sidebar-foot" id="sidebar-foot">Os dados ficam salvos<br>neste dispositivo.</div>
+    <button class="brand-edit" id="btn-blur-valores" style="margin:6px 24px 0;">🙈 Ocultar valores</button>
     <button class="brand-edit" id="btn-logout" style="display:none;margin:6px 24px 0;">⏻ Sair</button>
   </div>
 
@@ -749,6 +753,7 @@ async function saveEmpresa(){
 
 // ---------- Helpers ----------
 function brl(v){ return (v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+function mv(v){ return `<span class="valor-money">${brl(v)}</span>`; }
 function fmtDate(iso){ return new Date(iso).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function showToast(msg){
@@ -791,6 +796,18 @@ function resizeImage(file, maxSize=420){
 
 // ---------- Empresa (marca) ----------
 function custoOculto(){ return !!empresa.ocultarCusto; }
+
+function aplicarValoresOcultos(){
+  const escondido = localStorage.getItem('valoresOcultos') === '1';
+  document.body.classList.toggle('valores-ocultos', escondido);
+  document.getElementById('btn-blur-valores').textContent = escondido ? '\u{1F441} Mostrar valores' : '\u{1F648} Ocultar valores';
+}
+document.getElementById('btn-blur-valores').addEventListener('click', ()=>{
+  const atual = localStorage.getItem('valoresOcultos') === '1';
+  localStorage.setItem('valoresOcultos', atual ? '0' : '1');
+  aplicarValoresOcultos();
+});
+aplicarValoresOcultos();
 
 function renderBrand(){
   document.getElementById('brand-name').innerHTML = empresa.nome ? empresa.nome.replace(/\n/g,'<br>') : 'Controle de<br>Estoque';
@@ -867,9 +884,9 @@ function renderDashboard(){
   document.getElementById('dash-cards').innerHTML = `
     <div class="card"><div class="k">Produtos cadastrados</div><div class="v">${totalProdutos}</div></div>
     <div class="card"><div class="k">Itens em estoque</div><div class="v">${totalItens}</div></div>
-    <div class="card"><div class="k">Valor em estoque</div><div class="v">${brl(valorEstoque)}</div></div>
-    ${custoOculto() ? '' : `<div class="card"><div class="k">Lucro potencial</div><div class="v">${brl(lucroPotencial)}</div></div>`}
-    <div class="card"><div class="k">Receita total</div><div class="v">${brl(receitaTotal)}</div></div>
+    <div class="card"><div class="k">Valor em estoque</div><div class="v">${mv(valorEstoque)}</div></div>
+    ${custoOculto() ? '' : `<div class="card"><div class="k">Lucro potencial</div><div class="v">${mv(lucroPotencial)}</div></div>`}
+    <div class="card"><div class="k">Receita total</div><div class="v">${mv(receitaTotal)}</div></div>
     <div class="card${baixos.length?' alert':''}"><div class="k">Estoque baixo</div><div class="v">${baixos.length}</div></div>
     <div class="card"><div class="k">Vendas hoje</div><div class="v">${vendasHoje}</div></div>
   `;
@@ -905,10 +922,10 @@ function renderProdutos(){
         ${p.codigo ? `<div class="product-code">#${p.codigo}</div>` : ''}
         <div class="product-desc">${p.descricao || ''}</div>
         <div class="product-foot">
-          <span class="product-price">${brl(p.preco)}</span>
+          <span class="product-price">${mv(p.preco)}</span>
           <span class="product-qty">${p.qtd} un.</span>
         </div>
-        ${!custoOculto() && p.custo != null && p.custo !== '' ? `<div class="product-qty" style="margin-top:-2px;">Custo: ${brl(p.custo)} · margem ${brl(p.preco - p.custo)}</div>` : ''}
+        ${!custoOculto() && p.custo != null && p.custo !== '' ? `<div class="product-qty" style="margin-top:-2px;">Custo: ${mv(p.custo)} · margem ${mv(p.preco - p.custo)}</div>` : ''}
         <div class="product-actions">
           <button class="btn btn-ghost btn-sm" onclick="openEditProduto('${p.id}')">Editar</button>
           <button class="btn btn-danger btn-sm" onclick="deleteProduto('${p.id}')">Excluir</button>
@@ -1048,7 +1065,7 @@ function renderConsulta(){
         <div class="lookup-row-name">${p.nome}</div>
         <div class="lookup-row-meta">${p.codigo ? '#'+p.codigo+' · ' : ''}${p.qtd} un. em estoque</div>
       </div>
-      <div class="lookup-row-price">${brl(p.preco)}</div>
+      <div class="lookup-row-price">${mv(p.preco)}</div>
     </div>
   `).join('');
 
@@ -1075,10 +1092,10 @@ function renderLookupDetail(p){
     <div class="lookup-detail-name">${p.nome}</div>
     <div class="lookup-detail-code">${p.codigo ? '#'+p.codigo : 'sem código'}</div>
     <div class="lookup-stats">
-      <div class="lookup-stat"><div class="k">Preço de venda</div><div class="v">${brl(p.preco)}</div></div>
+      <div class="lookup-stat"><div class="k">Preço de venda</div><div class="v">${mv(p.preco)}</div></div>
       <div class="lookup-stat"><div class="k">Em estoque</div><div class="v" style="${baixo?'color:var(--accent);':''}">${p.qtd} un.</div></div>
-      ${!custoOculto() && p.custo != null && p.custo !== '' ? `<div class="lookup-stat"><div class="k">Custo</div><div class="v">${brl(p.custo)}</div></div>
-      <div class="lookup-stat"><div class="k">Margem</div><div class="v">${brl(p.preco - p.custo)}</div></div>` : ''}
+      ${!custoOculto() && p.custo != null && p.custo !== '' ? `<div class="lookup-stat"><div class="k">Custo</div><div class="v">${mv(p.custo)}</div></div>
+      <div class="lookup-stat"><div class="k">Margem</div><div class="v">${mv(p.preco - p.custo)}</div></div>` : ''}
       <div class="lookup-stat"><div class="k">Estoque mínimo</div><div class="v">${p.min ?? 5} un.</div></div>
       <div class="lookup-stat"><div class="k">Status</div><div class="v" style="${baixo?'color:var(--accent);':''}">${baixo ? 'Estoque baixo' : 'Normal'}</div></div>
     </div>
@@ -1334,17 +1351,17 @@ function renderCartTable(){
         <td><div class="lookup-thumb" style="${it.produtoImagem?`background-image:url('${it.produtoImagem}')`:''}"></div></td>
         <td>${it.produtoCodigo ? '['+it.produtoCodigo+'] ' : ''}${it.produtoNome}</td>
         <td class="num">${it.qtd}</td>
-        <td class="num">${brl(it.precoUnit)}</td>
-        <td class="num">${brl(it.qtd*it.precoUnit)}</td>
+        <td class="num">${mv(it.precoUnit)}</td>
+        <td class="num">${mv(it.qtd*it.precoUnit)}</td>
         <td><button class="btn btn-danger btn-sm" onclick="removerDoCarrinho(${idx})">Remover</button></td>
       </tr>`).join('')}
     </tbody></table>`;
   }
   const subtotal = cart.reduce((s,it)=>s+it.qtd*it.precoUnit,0);
   const descontoValor = calcularDescontoValor(subtotal);
-  document.getElementById('venda-subtotal').textContent = brl(subtotal);
-  document.getElementById('venda-desconto-valor').textContent = brl(descontoValor);
-  document.getElementById('venda-total').textContent = brl(subtotal - descontoValor);
+  document.getElementById('venda-subtotal').innerHTML = mv(subtotal);
+  document.getElementById('venda-desconto-valor').innerHTML = mv(descontoValor);
+  document.getElementById('venda-total').innerHTML = mv(subtotal - descontoValor);
 }
 document.getElementById('venda-desconto').addEventListener('input', renderCartTable);
 window.removerDoCarrinho = function(idx){
@@ -1393,7 +1410,7 @@ function abrirModalMerge(alvo, cliente){
   const vencFmt = alvo.dataPagamento ? new Date(alvo.dataPagamento+'T00:00').toLocaleDateString('pt-BR') : 'sem data definida';
   const situacao = alvo.statusPior === 'Vencido' ? '<span style="color:var(--danger);font-weight:600;">vencida</span>' : 'aguardando pagamento';
   document.getElementById('merge-info').innerHTML =
-    `<strong>${cliente.nome}</strong> já tem uma cobrança ${situacao} no valor de <strong>${brl(alvo.total)}</strong>, com vencimento em ${vencFmt}. Deseja somar esta nova venda a essa cobrança, ou lançar como uma cobrança separada?`;
+    `<strong>${cliente.nome}</strong> já tem uma cobrança ${situacao} no valor de <strong>${mv(alvo.total)}</strong>, com vencimento em ${vencFmt}. Deseja somar esta nova venda a essa cobrança, ou lançar como uma cobrança separada?`;
   mergeOverlay.classList.add('active');
 }
 document.getElementById('btn-merge-cancelar').addEventListener('click', ()=>{
@@ -1563,8 +1580,8 @@ function renderFinanceiro(){
   const qtdVencido = lista.filter(g=>g.statusPior==='Vencido').length;
 
   document.getElementById('fin-cards').innerHTML = `
-    <div class="card"><div class="k">Total a receber</div><div class="v">${brl(totalAReceber)}</div></div>
-    <div class="card${qtdVencido?' alert':''}"><div class="k">Total vencido</div><div class="v">${brl(totalVencido)}</div></div>
+    <div class="card"><div class="k">Total a receber</div><div class="v">${mv(totalAReceber)}</div></div>
+    <div class="card${qtdVencido?' alert':''}"><div class="k">Total vencido</div><div class="v">${mv(totalVencido)}</div></div>
     <div class="card"><div class="k">Aguardando pagamento</div><div class="v">${qtdAguardando}</div></div>
     <div class="card${qtdVencido?' alert':''}"><div class="k">Cobranças vencidas</div><div class="v">${qtdVencido}</div></div>
   `;
@@ -1592,7 +1609,7 @@ function renderFinanceiro(){
       <td>${fmtDate(g.data)}</td>
       <td>${g.dataPagamento ? new Date(g.dataPagamento+'T00:00').toLocaleDateString('pt-BR') : '—'}</td>
       <td class="num" style="color:${cor};font-weight:600;">${prazoTxt}</td>
-      <td class="num">${brl(g.total)}</td>
+      <td class="num">${mv(g.total)}</td>
       <td><span class="badge" style="background:${fundo};color:${cor};">${g.statusPior}</span></td>
       <td style="white-space:nowrap;">
         <button class="btn btn-ghost btn-sm" ${g.clienteContato?'':'disabled title="Sem contato cadastrado"'} onclick="cobrarWhatsApp('${g.key}')">📲 Cobrar</button>
@@ -1690,8 +1707,8 @@ function renderHistorico(){
   document.getElementById('hist-cards').innerHTML = `
     <div class="card"><div class="k">Vendas registradas</div><div class="v">${sales.length}</div></div>
     <div class="card"><div class="k">Itens vendidos</div><div class="v">${itensVendidos}</div></div>
-    <div class="card"><div class="k">Receita total</div><div class="v">${brl(receitaTotal)}</div></div>
-    ${oculto ? '' : `<div class="card"><div class="k">Lucro líquido</div><div class="v">${brl(lucroLiquido)}</div></div>`}
+    <div class="card"><div class="k">Receita total</div><div class="v">${mv(receitaTotal)}</div></div>
+    ${oculto ? '' : `<div class="card"><div class="k">Lucro líquido</div><div class="v">${mv(lucroLiquido)}</div></div>`}
   `;
   const body = document.getElementById('hist-body');
   if(!sales.length){
@@ -1711,10 +1728,10 @@ function renderHistorico(){
       <td class="num">${v.produtoCodigo || '—'}</td>
       <td>${v.produtoNome}</td>
       <td class="num">${v.qtd}</td>
-      <td class="num">${brl(v.precoUnit)}</td>
+      <td class="num">${mv(v.precoUnit)}</td>
       <td class="num">${v.descontoPct ? v.descontoPct+'%' : '—'}</td>
-      <td class="num">${brl(v.total)}</td>
-      <td class="num" style="${oculto?'display:none;':''}">${valorLiquido != null ? brl(valorLiquido) : '—'}</td>
+      <td class="num">${mv(v.total)}</td>
+      <td class="num" style="${oculto?'display:none;':''}">${valorLiquido != null ? mv(valorLiquido) : '—'}</td>
       <td>${v.forma || '—'}</td>
       <td>
         <select class="status-pgto-select" style="color:${corPgto};" ${v.cancelada?'disabled':''} onchange="atualizarStatusPagamento('${v.id}', this.value)">
