@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Controle de Estoque e Vendas</title>
+<title>Livro — Controle de Estoque e Vendas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -1329,8 +1329,9 @@ function renderCartTable(){
   if(!cart.length){
     wrap.innerHTML = '<div class="empty">Nenhum item adicionado ainda. Escolha um produto e clique em "Adicionar à venda".</div>';
   } else {
-    wrap.innerHTML = `<table><thead><tr><th>Produto</th><th>Qtd.</th><th>Preço un.</th><th>Subtotal</th><th></th></tr></thead><tbody>
+    wrap.innerHTML = `<table><thead><tr><th></th><th>Produto</th><th>Qtd.</th><th>Preço un.</th><th>Subtotal</th><th></th></tr></thead><tbody>
       ${cart.map((it,idx)=>`<tr>
+        <td><div class="lookup-thumb" style="${it.produtoImagem?`background-image:url('${it.produtoImagem}')`:''}"></div></td>
         <td>${it.produtoCodigo ? '['+it.produtoCodigo+'] ' : ''}${it.produtoNome}</td>
         <td class="num">${it.qtd}</td>
         <td class="num">${brl(it.precoUnit)}</td>
@@ -1362,7 +1363,7 @@ document.getElementById('btn-add-carrinho').addEventListener('click', ()=>{
 
   const existente = cart.find(it=>it.produtoId===p.id);
   if(existente) existente.qtd += qtd;
-  else cart.push({ produtoId: p.id, produtoNome: p.nome, produtoCodigo: p.codigo||'', qtd, precoUnit: p.preco });
+  else cart.push({ produtoId: p.id, produtoNome: p.nome, produtoCodigo: p.codigo||'', produtoImagem: p.imagem||null, qtd, precoUnit: p.preco });
 
   renderCartTable();
   document.getElementById('venda-qtd').value = 1;
