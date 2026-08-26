@@ -377,6 +377,17 @@ tr.cancelled td.status-cell{text-decoration:none;}
           <p>Clientes com pagamento aguardando ou vencido.</p>
         </div>
       </div>
+      <div class="toolbar" style="align-items:flex-end;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Vencimento de</label>
+          <input type="date" id="fin-data-de" style="padding:10px 12px;border:1px solid var(--line);border-radius:3px;font-family:'Inter',sans-serif;font-size:14px;background:var(--surface);">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">até</label>
+          <input type="date" id="fin-data-ate" style="padding:10px 12px;border:1px solid var(--line);border-radius:3px;font-family:'Inter',sans-serif;font-size:14px;background:var(--surface);">
+        </div>
+        <button class="btn btn-ghost" id="btn-fin-limpar-filtro">Limpar filtro</button>
+      </div>
       <div class="cards" id="fin-cards" style="margin-bottom:18px;"></div>
       <div style="overflow-x:auto;">
       <table>
@@ -1572,7 +1583,13 @@ function renderFinanceiro(){
     if(status === 'Vencido') grupos[key].statusPior = 'Vencido';
   });
 
-  const lista = Object.values(grupos).sort((a,b)=> new Date(a.dataPagamento||a.data) - new Date(b.dataPagamento||b.data));
+  const dataDe = document.getElementById('fin-data-de').value;
+  const dataAte = document.getElementById('fin-data-ate').value;
+  let listaBruta = Object.values(grupos);
+  if(dataDe) listaBruta = listaBruta.filter(g => g.dataPagamento && g.dataPagamento >= dataDe);
+  if(dataAte) listaBruta = listaBruta.filter(g => g.dataPagamento && g.dataPagamento <= dataAte);
+
+  const lista = listaBruta.sort((a,b)=> new Date(a.dataPagamento||a.data) - new Date(b.dataPagamento||b.data));
   financeiroGrupos = grupos;
   const totalAReceber = lista.reduce((s,g)=>s+g.total,0);
   const totalVencido = lista.filter(g=>g.statusPior==='Vencido').reduce((s,g)=>s+g.total,0);
@@ -1588,7 +1605,7 @@ function renderFinanceiro(){
 
   const body = document.getElementById('fin-body');
   if(!lista.length){
-    body.innerHTML = '<tr><td colspan="8" class="empty">Nenhum cliente com pagamento pendente. 🎉</td></tr>';
+    body.innerHTML = `<tr><td colspan="8" class="empty">${(dataDe||dataAte) ? 'Nenhuma cobrança pendente nesse período.' : 'Nenhum cliente com pagamento pendente. 🎉'}</td></tr>`;
     return;
   }
   const hoje = hojeLocalStr();
@@ -1618,6 +1635,14 @@ function renderFinanceiro(){
     </tr>`;
   }).join('');
 }
+
+document.getElementById('fin-data-de').addEventListener('change', renderFinanceiro);
+document.getElementById('fin-data-ate').addEventListener('change', renderFinanceiro);
+document.getElementById('btn-fin-limpar-filtro').addEventListener('click', ()=>{
+  document.getElementById('fin-data-de').value = '';
+  document.getElementById('fin-data-ate').value = '';
+  renderFinanceiro();
+});
 
 function formatarTelefoneWhatsApp(contato){
   let digitos = String(contato||'').replace(/\D/g,'');
@@ -1908,7 +1933,13 @@ document.getElementById('btn-login').addEventListener('click', async ()=>{
   erroEl.style.display = 'none';
   if(!email || !senha){ erroEl.textContent = 'Preencha e-mail e senha.'; erroEl.style.display = 'block'; return; }
   const {error} = await supabaseClient.auth.signInWithPassword({ email, password: senha });
-  if(error){ erroEl.textContent = 'E-mail ou senha inválidos.'; erroEl.style.display = 'block'; return; }
+  if(error){
+    erroEl.textContent = (error.message||'').toLowerCase().includes('confirm')
+      ? 'Confirme seu e-mail (verifique sua caixa de entrada) antes de entrar.'
+      : 'E-mail ou senha inválidos.';
+    erroEl.style.display = 'block';
+    return;
+  }
   document.getElementById('login-senha').value = '';
   mostrarApp();
   await bootApp();
