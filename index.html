@@ -660,6 +660,7 @@ function toDbVenda(v){
     cliente_nome: v.clienteNome || null,
     cliente_contato: v.clienteContato || null,
     status_pagamento: v.statusPagamento || 'Aguardando Pagamento',
+    cobrado_em: v.cobradoEm || null,
     cancelada: !!v.cancelada
   };
 }
@@ -683,6 +684,7 @@ function fromDbVenda(row){
     clienteNome: row.cliente_nome || '',
     clienteContato: row.cliente_contato || '',
     statusPagamento: row.status_pagamento || 'Aguardando Pagamento',
+    cobradoEm: row.cobrado_em || null,
     cancelada: !!row.cancelada
   };
 }
@@ -1592,11 +1594,13 @@ function renderFinanceiro(){
         data: v.data,
         dataPagamento: v.dataPagamento,
         statusPior: 'Aguardando Pagamento',
-        total: 0
+        total: 0,
+        cobradoEm: null
       };
     }
     grupos[key].total += v.total;
     if(status === 'Vencido') grupos[key].statusPior = 'Vencido';
+    if(v.cobradoEm && (!grupos[key].cobradoEm || v.cobradoEm > grupos[key].cobradoEm)) grupos[key].cobradoEm = v.cobradoEm;
   });
 
   const dataDe = document.getElementById('fin-data-de').value;
@@ -1645,8 +1649,11 @@ function renderFinanceiro(){
       <td class="num">${mv(g.total)}</td>
       <td><span class="badge" style="background:${fundo};color:${cor};">${g.statusPior}</span></td>
       <td style="white-space:nowrap;">
-        <button class="btn btn-ghost btn-sm" ${g.clienteContato?'':'disabled title="Sem contato cadastrado"'} onclick="cobrarWhatsApp('${g.key}')">📲 Cobrar</button>
-        <button class="btn btn-primary btn-sm" onclick="marcarGrupoPago('${g.key}')">Pago</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" ${g.clienteContato?'':'disabled title="Sem contato cadastrado"'} onclick="cobrarWhatsApp('${g.key}')">📲 Cobrar</button>
+          <button class="btn btn-primary btn-sm" onclick="marcarGrupoPago('${g.key}')">Pago</button>
+          ${g.cobradoEm ? `<span class="badge" style="background:#DCEAE3;color:var(--primary-dark);white-space:nowrap;" title="Cobrado em ${fmtDate(g.cobradoEm)}">✓ Cobrado</span>` : ''}
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -1703,7 +1710,7 @@ function montarMensagemCobranca(g){
     + `Ficamos à disposição. ${EMOJI_APERTO_MAO}`;
 }
 
-window.cobrarWhatsApp = function(key){
+window.cobrarWhatsApp = async function(key){
   const g = financeiroGrupos[key];
   if(!g || !g.clienteContato){ showToast('Este cliente não tem contato cadastrado.'); return; }
   const telefone = formatarTelefoneWhatsApp(g.clienteContato);
@@ -1711,6 +1718,12 @@ window.cobrarWhatsApp = function(key){
   const mensagem = montarMensagemCobranca(g);
   const url = `https://wa.me/${telefone}?text=${encodeURIComponent(mensagem)}`;
   window.open(url, '_blank');
+
+  const agora = new Date().toISOString();
+  const itens = sales.filter(v => (v.vendaGrupo || v.id) === key && !v.cancelada);
+  itens.forEach(v => v.cobradoEm = agora);
+  await saveSales();
+  renderFinanceiro();
 };
 
 window.copiarMensagemCobranca = async function(key){
